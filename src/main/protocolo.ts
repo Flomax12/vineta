@@ -13,6 +13,9 @@ import { carpetaPortadas } from './rutas'
 
 export const ESQUEMA = 'lector'
 
+// VINETA_DEPURAR=1 muestra en consola cada pedido de imagen y sus errores.
+const depurar = !!process.env['VINETA_DEPURAR']
+
 export function registrarEsquema(): void {
   protocol.registerSchemesAsPrivileged([
     { scheme: ESQUEMA, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
@@ -47,6 +50,7 @@ async function portada(mangaId: string, archivo: string): Promise<Response> {
 
 export function manejarProtocolo(): void {
   protocol.handle(ESQUEMA, async (peticion) => {
+    if (depurar) console.log('[lector]', peticion.url)
     try {
       const u = new URL(peticion.url)
       const partes = u.pathname.split('/').filter(Boolean).map(decodeURIComponent)
@@ -63,7 +67,8 @@ export function manejarProtocolo(): void {
         return imagen(datos, tipo, 'max-age=3600')
       }
       return noEncontrado()
-    } catch {
+    } catch (e) {
+      if (depurar) console.log('[lector] error', peticion.url, e)
       return new Response('Error al cargar la imagen', { status: 502 })
     }
   })

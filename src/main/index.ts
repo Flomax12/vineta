@@ -9,6 +9,11 @@ import { manejarProtocolo, registrarEsquema } from './protocolo'
 // Para pruebas: permite usar otra carpeta de datos sin tocar la real.
 if (process.env['VINETA_DATOS']) app.setPath('userData', process.env['VINETA_DATOS'])
 
+// El nombre "Viñeta" va dentro del User-Agent de la ventana, y la "ñ" hace fallar
+// los pedidos al protocolo lector:// en la app instalada (los encabezados solo
+// aceptan caracteres latinos básicos). Se deja el User-Agent solo en ASCII.
+app.userAgentFallback = app.userAgentFallback.normalize('NFD').replace(/[^ -~]/g, '')
+
 registrarEsquema()
 app.setAppUserModelId('cl.flomac.vineta')
 
