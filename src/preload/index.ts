@@ -24,6 +24,12 @@ const api: ApiVineta = {
   descargar: (m, ids) => llamar('descargas:agregar', m, ids),
   cancelarDescarga: (id) => llamar('descargas:cancelar', id),
   borrarDescarga: (id) => llamar('descargas:borrar', id),
+  descargarManga: (m, ids) => llamar('descargas:manga', m, ids),
+  descargaAutomatica: (m, activar) => llamar('descargas:automatica', m, activar),
+  borrarManga: (m) => llamar('descargas:borrarManga', m),
+  elegirCarpetaDescargas: () => llamar('descargas:elegirCarpeta'),
+  restablecerCarpetaDescargas: () => llamar('descargas:restablecerCarpeta'),
+  revisarCarpetaDescargas: () => llamar('descargas:revisarCarpeta'),
   alCambiarDescargas: (cb) => {
     const oyente = (_e: IpcRendererEvent, estado: EstadoDescargas) => cb(estado)
     ipcRenderer.on('descargas:cambio', oyente)

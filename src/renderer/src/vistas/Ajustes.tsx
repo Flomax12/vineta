@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import type { Calidad, Idioma } from '@compartido/tipos'
 import { useGlobal } from '../contexto'
 import { IcoCarpeta } from '../componentes/Iconos'
+import { SelectorCarpeta } from '../componentes/SelectorCarpeta'
 import { api, clases } from '../util'
 
 const IDIOMAS: { valor: Idioma; nombre: string }[] = [
@@ -109,7 +110,10 @@ export default function Ajustes() {
       </Fila>
 
       <h2 className="subtitulo">Datos</h2>
-      <Fila titulo="Carpeta de datos" ayuda="Biblioteca, progreso, portadas y descargas.">
+      <Fila titulo="Carpeta de los mangas" ayuda="Dónde se guardan las descargas. Puede ser otro disco o un pendrive; lo ya descargado se mueve.">
+        <SelectorCarpeta />
+      </Fila>
+      <Fila titulo="Carpeta de datos" ayuda="Biblioteca, progreso y portadas.">
         <button className="boton secundario" onClick={() => api.abrirCarpetaDatos()}>
           <IcoCarpeta tam={16} /> Abrir carpeta
         </button>

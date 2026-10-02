@@ -41,6 +41,8 @@ export interface ResultadoFicha {
   /** true si internet falló y se muestra la copia guardada. */
   sinConexion: boolean
   enBiblioteca: boolean
+  /** Descarga automática: baja los capítulos nuevos apenas salen. */
+  automatica: boolean
 }
 
 export interface ProgresoCapitulo {
@@ -62,6 +64,8 @@ export interface Ajustes {
   modoLectura: ModoLectura
   direccion: Direccion
   anchoVertical: number
+  /** Carpeta elegida para las descargas; null = la carpeta de datos de la app. */
+  carpetaDescargas: string | null
 }
 
 export const AJUSTES_INICIALES: Ajustes = {
@@ -70,7 +74,8 @@ export const AJUSTES_INICIALES: Ajustes = {
   calidadDescarga: 'ahorro',
   modoLectura: 'vertical',
   direccion: 'der-izq',
-  anchoVertical: 820
+  anchoVertical: 820,
+  carpetaDescargas: null
 }
 
 export type OrdenExplorar = 'populares' | 'recientes' | 'nuevos'
@@ -116,6 +121,20 @@ export interface EstadoDescargas {
   descargados: Record<string, CapituloDescargado>
   bytesTotales: number
   libreEnDisco: number | null
+  carpeta: string
+  /** true si el usuario eligió una carpeta propia. */
+  carpetaPersonalizada: boolean
+  /** false si la carpeta no existe (p. ej. un pendrive desconectado). */
+  carpetaDisponible: boolean
+  /** Mangas con descarga automática de capítulos nuevos. */
+  automaticos: string[]
+}
+
+export interface ResultadoCarpeta {
+  ok: boolean
+  carpeta?: string
+  movidos?: number
+  error?: string
 }
 
 export interface PaginasCapitulo {
@@ -128,6 +147,7 @@ export interface EntradaBiblioteca {
   sinLeer: number
   descargados: number
   ultimoLeido: number
+  automatica: boolean
 }
 
 /** API que el preload expone en window.vineta. */
@@ -152,6 +172,14 @@ export interface ApiVineta {
   descargar(mangaId: string, capituloIds: string[]): Promise<void>
   cancelarDescarga(capituloId: string): Promise<void>
   borrarDescarga(capituloId: string): Promise<void>
+  /** Baja todo lo que falta, agrega a la biblioteca y activa la descarga automática. */
+  descargarManga(mangaId: string, capituloIds: string[]): Promise<void>
+  descargaAutomatica(mangaId: string, activar: boolean): Promise<void>
+  /** Borra todos los capítulos descargados del manga y apaga su descarga automática. */
+  borrarManga(mangaId: string): Promise<void>
+  elegirCarpetaDescargas(): Promise<ResultadoCarpeta>
+  restablecerCarpetaDescargas(): Promise<ResultadoCarpeta>
+  revisarCarpetaDescargas(): Promise<void>
   alCambiarDescargas(cb: (e: EstadoDescargas) => void): () => void
 
   red(): Promise<boolean>

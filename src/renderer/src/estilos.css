@@ -1371,7 +1371,8 @@ img.sin-cargar {
 }
 
 .ajuste-control {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 @media (max-width: 1100px) {
@@ -1394,4 +1395,134 @@ img.sin-cargar {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---------- Carpeta y descarga automática ---------- */
+
+.resumen-carpeta {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--borde);
+}
+
+.selector-carpeta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ajuste .selector-carpeta {
+  align-items: flex-end;
+  width: 380px;
+  max-width: 100%;
+}
+
+.ajuste .ruta-carpeta {
+  width: 100%;
+}
+
+.ruta-carpeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 9px;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12.5px;
+  user-select: text;
+}
+
+.ruta-carpeta svg {
+  flex: none;
+}
+
+.ruta-carpeta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.ruta-carpeta.no-disponible {
+  border-color: var(--peligro);
+  color: var(--peligro);
+}
+
+.fila-botones.izq {
+  justify-content: flex-start;
+}
+
+.selector-carpeta .nota {
+  margin: 0;
+}
+
+.aviso-carpeta {
+  border-color: color-mix(in srgb, var(--peligro) 45%, transparent);
+}
+
+.aviso-carpeta span {
+  flex: 1;
+}
+
+.aviso-descarga {
+  margin: 14px 0 0;
+  color: var(--texto);
+}
+
+.interruptor {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: var(--texto-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.perilla {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  box-shadow: inset 0 0 0 1px var(--borde);
+  transition: background 0.15s;
+}
+
+.perilla::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--texto-3);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.interruptor.encendido {
+  color: var(--texto);
+}
+
+.interruptor.encendido .perilla {
+  background: var(--acento);
+  box-shadow: none;
+}
+
+.interruptor.encendido .perilla::after {
+  background: #fff;
+  transform: translateX(14px);
 }

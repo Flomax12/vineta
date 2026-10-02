@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import type { CapituloDescargado } from '@compartido/tipos'
 import { useGlobal, useNav } from '../contexto'
-import { IcoBasura, IcoCerrar, IcoDescarga, IcoRefrescar } from '../componentes/Iconos'
+import { IcoBasura, IcoCerrar, IcoDescarga, IcoRefrescar, IcoSinRed } from '../componentes/Iconos'
 import { Portada } from '../componentes/Portada'
+import { SelectorCarpeta } from '../componentes/SelectorCarpeta'
 import { api, clases, formatoBytes } from '../util'
 
 const POCO_ESPACIO = 1024 ** 3 // 1 GB
@@ -30,6 +31,19 @@ export default function Descargas() {
         <h1 className="titulo-vista">Descargas</h1>
       </header>
 
+      {!descargas.carpetaDisponible && (
+        <div className="aviso aviso-carpeta">
+          <IcoSinRed tam={18} />
+          <span>
+            No se encuentra la carpeta <strong>{descargas.carpeta}</strong>. Si está en un pendrive o disco externo, conéctalo
+            y toca «Revisar de nuevo».
+          </span>
+          <button className="boton secundario" onClick={() => api.revisarCarpetaDescargas()}>
+            Revisar de nuevo
+          </button>
+        </div>
+      )}
+
       <div className="resumen-espacio">
         <div>
           <span className="cifra">{formatoBytes(descargas.bytesTotales)}</span>
@@ -42,8 +56,15 @@ export default function Descargas() {
           </div>
         )}
         {libre !== null && libre < POCO_ESPACIO && (
-          <p className="aviso">Queda poco espacio. Usa la calidad «ahorro» en Ajustes o borra capítulos ya leídos.</p>
+          <p className="aviso">
+            Queda poco espacio. Elige una carpeta en otro disco o pendrive, usa la calidad «ahorro» en Ajustes o borra
+            capítulos ya leídos.
+          </p>
         )}
+        <div className="resumen-carpeta">
+          <span className="rotulo">Los mangas se guardan en</span>
+          <SelectorCarpeta />
+        </div>
       </div>
 
       {(enCurso.length > 0 || conError.length > 0) && (
@@ -86,7 +107,10 @@ export default function Descargas() {
         <div className="vacio">
           <IcoDescarga tam={40} />
           <h2>Nada descargado todavía</h2>
-          <p>En la ficha de un manga, toca el ícono de descarga de un capítulo para tenerlo disponible sin internet.</p>
+          <p>
+            En la ficha de un manga, toca «Descargar manga» para bajarlo completo (y sus capítulos nuevos), o el ícono de
+            descarga de un capítulo suelto.
+          </p>
         </div>
       ) : (
         <ul className="descargados">
@@ -94,6 +118,7 @@ export default function Descargas() {
             const m = caps[0]
             const bytes = caps.reduce((s, c) => s + c.bytes, 0)
             const estaAbierto = abierto === m.mangaId
+            const auto = descargas.automaticos.includes(m.mangaId)
             return (
               <li key={m.mangaId} className="descargado">
                 <div className="descargado-cabecera">
@@ -107,10 +132,20 @@ export default function Descargas() {
                     </span>
                   </button>
                   <button
+                    className={clases('interruptor', auto && 'encendido')}
+                    role="switch"
+                    aria-checked={auto}
+                    onClick={() => api.descargaAutomatica(m.mangaId, !auto)}
+                    title="Descargar solos los capítulos nuevos"
+                  >
+                    <span className="perilla" aria-hidden="true" />
+                    Automático
+                  </button>
+                  <button
                     className="boton-texto peligro"
                     onClick={() => {
-                      if (confirm(`¿Borrar los ${caps.length} capítulos descargados de «${m.tituloManga}»?`))
-                        caps.forEach((c) => void api.borrarDescarga(c.capituloId))
+                      if (confirm(`¿Borrar los ${caps.length} capítulos descargados de «${m.tituloManga}»? También se apaga su descarga automática.`))
+                        void api.borrarManga(m.mangaId)
                     }}
                   >
                     <IcoBasura tam={16} /> Borrar todo

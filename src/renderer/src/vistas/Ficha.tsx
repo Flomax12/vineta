@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Capitulo, ProgresoManga, ResultadoFicha } from '@compartido/tipos'
 import { useGlobal, useNav } from '../contexto'
 import { FilaCapitulo } from '../componentes/FilaCapitulo'
-import { IcoAtras, IcoDescarga, IcoExterno, IcoLibro, IcoMarcador, IcoMarcadorOk, IcoOrden, IcoSinRed } from '../componentes/Iconos'
+import { IcoAtras, IcoCheck, IcoDescarga, IcoExterno, IcoLibro, IcoMarcador, IcoMarcadorOk, IcoOrden, IcoSinRed } from '../componentes/Iconos'
 import { Portada } from '../componentes/Portada'
 import { agruparCapitulos, api, clases, etiquetaCapitulo, formatoBytes, mensajeError, urlPortada } from '../util'
 
@@ -19,6 +19,7 @@ export default function Ficha({ id }: { id: string }) {
   const [elecciones, setElecciones] = useState<Record<string, string>>({})
   const [verMas, setVerMas] = useState(false)
   const [confirmar, setConfirmar] = useState<{ ids: string[]; paginas: number; texto: string } | null>(null)
+  const [avisoDescarga, setAvisoDescarga] = useState<string | null>(null)
 
   async function cargar() {
     setError(null)
@@ -101,7 +102,6 @@ export default function Ficha({ id }: { id: string }) {
     ir({ vista: 'lector', mangaId: f.id, tituloManga: f.titulo, capituloId: cap.id, lista })
 
   const pendientes = lista.filter((c) => !descargas.descargados[c.id] && !descargas.cola.some((d) => d.capituloId === c.id))
-  const noLeidos = pendientes.filter((c) => !progreso.capitulos[c.id]?.leido)
 
   const pedirConfirmacion = (caps: Capitulo[], texto: string) =>
     setConfirmar({ ids: caps.map((c) => c.id), paginas: caps.reduce((s, c) => s + c.paginas, 0), texto })
@@ -116,6 +116,34 @@ export default function Ficha({ id }: { id: string }) {
     if (res.enBiblioteca) await api.quitarDeBiblioteca(id)
     else await api.agregarABiblioteca(id)
     setRes({ ...res, enBiblioteca: !res.enBiblioteca })
+  }
+
+  // Un clic: baja todo lo que falta y deja el manga en descarga automática.
+  async function descargarManga() {
+    if (!res) return
+    if (!descargas.carpetaDisponible) {
+      setAvisoDescarga('No se encuentra la carpeta de descargas. Revísala en la sección Descargas.')
+      return
+    }
+    const peso = pendientes.reduce((s, c) => s + c.paginas, 0) * MB_POR_PAGINA[calidad] * 1024 * 1024
+    if (libre !== null && peso > libre * 0.8) {
+      pedirConfirmacion(pendientes, 'todo el manga')
+      return
+    }
+    await api.descargarManga(id, pendientes.map((c) => c.id))
+    setRes({ ...res, automatica: true, enBiblioteca: true })
+    setAvisoDescarga(
+      pendientes.length
+        ? `Descargando ${pendientes.length} ${pendientes.length === 1 ? 'capítulo' : 'capítulos'} (unos ${formatoBytes(peso)}). Los nuevos se bajarán solos.`
+        : 'Ya tienes todo descargado. Los capítulos nuevos se bajarán solos.'
+    )
+  }
+
+  async function alternarAutomatica(activar: boolean) {
+    if (!res) return
+    await api.descargaAutomatica(id, activar)
+    setRes({ ...res, automatica: activar })
+    setAvisoDescarga(activar ? 'Los capítulos nuevos se bajarán solos.' : 'Descarga automática desactivada. Lo ya descargado se mantiene.')
   }
 
   async function marcar(ids: string[], leido: boolean) {
@@ -166,10 +194,24 @@ export default function Ficha({ id }: { id: string }) {
               {res?.enBiblioteca ? <IcoMarcadorOk tam={18} /> : <IcoMarcador tam={18} />}
               {res?.enBiblioteca ? 'En tu biblioteca' : 'Agregar a biblioteca'}
             </button>
-            {!sinRed && pendientes.length > 0 && (
-              <button className="boton secundario" onClick={() => pedirConfirmacion(noLeidos.length ? noLeidos : pendientes, noLeidos.length ? 'los capítulos sin leer' : 'todos los capítulos')}>
-                <IcoDescarga tam={18} /> Descargar {noLeidos.length ? 'no leídos' : 'todo'}
+            {res?.automatica ? (
+              <button
+                className="boton secundario marcado"
+                onClick={() => alternarAutomatica(false)}
+                title="Los capítulos nuevos se descargan solos. Clic para desactivar."
+              >
+                <IcoCheck tam={18} /> Descarga automática
               </button>
+            ) : (
+              !sinRed && (
+                <button
+                  className="boton secundario"
+                  onClick={descargarManga}
+                  title="Descarga todos los capítulos y después los nuevos que vayan saliendo"
+                >
+                  <IcoDescarga tam={18} /> Descargar manga
+                </button>
+              )
             )}
             {!sinRed && (
               <button
@@ -182,6 +224,7 @@ export default function Ficha({ id }: { id: string }) {
               </button>
             )}
           </div>
+          {avisoDescarga && <p className="nota aviso-descarga">{avisoDescarga}</p>}
           {confirmar && (
             <div className="confirmacion" role="dialog" aria-label="Confirmar descarga">
               <p>
@@ -195,7 +238,8 @@ export default function Ficha({ id }: { id: string }) {
                 <button
                   className="boton"
                   onClick={() => {
-                    void api.descargar(id, confirmar.ids)
+                    void api.descargarManga(id, confirmar.ids)
+                    if (res) setRes({ ...res, automatica: true, enBiblioteca: true })
                     setConfirmar(null)
                   }}
                 >

@@ -19,6 +19,8 @@ interface Datos {
   fichas: Record<string, Ficha>
   progreso: Record<string, ProgresoManga>
   ajustes: Ajustes
+  /** Mangas cuyos capítulos nuevos se descargan solos. */
+  automaticos: string[]
 }
 
 const ruta = () => join(app.getPath('userData'), 'datos.json')
@@ -27,7 +29,7 @@ let datos: Datos = vacio()
 let temporizador: NodeJS.Timeout | null = null
 
 function vacio(): Datos {
-  return { version: 1, biblioteca: [], fichas: {}, progreso: {}, ajustes: { ...AJUSTES_INICIALES } }
+  return { version: 1, biblioteca: [], fichas: {}, progreso: {}, ajustes: { ...AJUSTES_INICIALES }, automaticos: [] }
 }
 
 export async function cargar(): Promise<void> {
@@ -81,16 +83,36 @@ function limpiarAjustes(a: Ajustes): Ajustes {
     calidadDescarga: a.calidadDescarga === 'alta' ? 'alta' : 'ahorro',
     modoLectura: a.modoLectura === 'paginas' ? 'paginas' : 'vertical',
     direccion: a.direccion === 'izq-der' ? 'izq-der' : 'der-izq',
-    anchoVertical: Math.min(1600, Math.max(400, Math.round(Number(a.anchoVertical) || 820)))
+    anchoVertical: Math.min(1600, Math.max(400, Math.round(Number(a.anchoVertical) || 820))),
+    carpetaDescargas: typeof a.carpetaDescargas === 'string' && a.carpetaDescargas ? a.carpetaDescargas : null
   }
 }
 
 export const ajustes = (): Ajustes => datos.ajustes
 
+/** Cambios pedidos desde la ventana: la carpeta de descargas no se toca por aquí. */
 export function cambiarAjustes(parcial: Partial<Ajustes>): Ajustes {
-  datos.ajustes = limpiarAjustes({ ...datos.ajustes, ...parcial })
+  datos.ajustes = limpiarAjustes({ ...datos.ajustes, ...parcial, carpetaDescargas: datos.ajustes.carpetaDescargas })
   guardar()
   return datos.ajustes
+}
+
+/** Solo la llama el proceso principal, después de mover las descargas. */
+export function fijarCarpetaDescargas(carpeta: string | null): void {
+  datos.ajustes = { ...datos.ajustes, carpetaDescargas: carpeta }
+  guardar()
+  guardarYa()
+}
+
+// --- Descarga automática ---
+
+export const automaticos = (): string[] => [...datos.automaticos]
+export const esAutomatico = (id: string): boolean => datos.automaticos.includes(id)
+
+export function marcarAutomatico(id: string, activar: boolean): void {
+  datos.automaticos = datos.automaticos.filter((x) => x !== id)
+  if (activar) datos.automaticos.push(id)
+  guardar()
 }
 
 // --- Fichas y biblioteca ---

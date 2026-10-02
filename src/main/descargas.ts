@@ -1,14 +1,16 @@
 // Cola de descargas: baja un capítulo a la vez (3 páginas en paralelo) a una
 // carpeta ".parcial" y solo la renombra cuando terminó entera.
 import { BrowserWindow } from 'electron'
-import { mkdir, readdir, readFile, rename, rm, statfs, writeFile } from 'node:fs/promises'
-import { extname, join } from 'node:path'
-import type { Capitulo, CapituloDescargado, DescargaEnCurso, EstadoDescargas, Ficha } from '@compartido/tipos'
+import { constants, existsSync } from 'node:fs'
+import { access, cp, mkdir, readdir, readFile, rename, rm, rmdir, statfs, writeFile } from 'node:fs/promises'
+import { extname, join, resolve, sep } from 'node:path'
+import type { Capitulo, CapituloDescargado, DescargaEnCurso, EstadoDescargas, Ficha, ResultadoCarpeta } from '@compartido/tipos'
 import * as almacen from './almacen'
 import { bajarImagen, esUuid, servidorCapitulo, SinConexion, urlImagen } from './mangadex'
-import { carpetaDescargas } from './rutas'
+import { carpetaDescargas, carpetaDescargasInicial } from './rutas'
 
 const cola: DescargaEnCurso[] = []
+let moviendo = false
 const descargados = new Map<string, CapituloDescargado>()
 let actual: { capituloId: string; control: AbortController } | null = null
 
@@ -24,26 +26,48 @@ export const tieneDescargas = (mangaId: string) => [...descargados.values()].som
 export const cantidadDescargada = (mangaId: string) =>
   [...descargados.values()].filter((d) => d.mangaId === mangaId).length
 
-/** Lee lo que ya está descargado y limpia descargas a medias de una sesión anterior. */
+let carpetaDisponible = true
+
+/**
+ * Lee lo que ya está descargado y limpia descargas a medias de una sesión anterior.
+ * Solo mira carpetas con nombre de id de MangaDex, así no toca otros archivos
+ * si la carpeta elegida es compartida.
+ */
 export async function indexar(): Promise<void> {
+  descargados.clear()
   const raiz = carpetaDescargas()
-  await mkdir(raiz, { recursive: true })
+  try {
+    await mkdir(raiz, { recursive: true })
+    await access(raiz, constants.W_OK)
+    carpetaDisponible = true
+  } catch {
+    carpetaDisponible = false
+    return
+  }
   for (const manga of await readdir(raiz)) {
     if (!esUuid(manga)) continue
-    for (const cap of await readdir(join(raiz, manga))) {
+    for (const cap of await readdir(join(raiz, manga)).catch(() => [] as string[])) {
       const dir = join(raiz, manga, cap)
-      if (cap.endsWith('.parcial')) {
+      if (cap.endsWith('.parcial') && esUuid(cap.slice(0, -8))) {
         await rm(dir, { recursive: true, force: true })
         continue
       }
+      if (!esUuid(cap)) continue
       try {
         const info = JSON.parse(await readFile(join(dir, 'info.json'), 'utf8')) as CapituloDescargado
         if (info.capituloId === cap && info.mangaId === manga) descargados.set(cap, info)
       } catch {
-        await rm(dir, { recursive: true, force: true })
+        // Capítulo sin info.json: quedó incompleto, se ignora.
       }
     }
   }
+}
+
+/** Vuelve a revisar la carpeta (p. ej. al conectar el pendrive). */
+export async function revisarCarpeta(): Promise<void> {
+  libreCache.hora = 0
+  await indexar()
+  avisar()
 }
 
 let libreCache: { valor: number | null; hora: number } = { valor: null, hora: 0 }
@@ -66,12 +90,16 @@ export async function estado(): Promise<EstadoDescargas> {
     cola: cola.map((d) => ({ ...d })),
     descargados: Object.fromEntries(descargados),
     bytesTotales,
-    libreEnDisco: await libreEnDisco()
+    libreEnDisco: await libreEnDisco(),
+    carpeta: carpetaDescargas(),
+    carpetaPersonalizada: almacen.ajustes().carpetaDescargas !== null,
+    carpetaDisponible,
+    automaticos: almacen.automaticos()
   }
 }
 
 let avisoPendiente = false
-function avisar(): void {
+export function avisar(): void {
   if (avisoPendiente) return
   avisoPendiente = true
   setTimeout(async () => {
@@ -108,7 +136,12 @@ export function encolar(ficha: Ficha, ids: string[]): void {
 }
 
 async function procesar(): Promise<void> {
-  if (actual) return
+  if (actual || moviendo) return
+  if (!carpetaDisponible) {
+    for (const d of cola) if (d.estado === 'en-cola') Object.assign(d, { estado: 'error', error: 'La carpeta de descargas no está disponible' })
+    avisar()
+    return
+  }
   for (;;) {
     const siguiente = cola.find((d) => d.estado === 'en-cola')
     if (!siguiente) break
@@ -218,4 +251,75 @@ export function rutaPaginaLocal(mangaId: string, capituloId: string, archivo: st
   const info = descargados.get(capituloId)
   if (!info || info.mangaId !== mangaId || !info.archivos.includes(archivo)) return null
   return join(carpetaDescargas(), mangaId, capituloId, archivo)
+}
+
+export const enCola = (capituloId: string) => cola.some((d) => d.capituloId === capituloId)
+
+/** Borra todos los capítulos de un manga y cancela los que estaban en cola. */
+export async function borrarManga(mangaId: string): Promise<void> {
+  for (const d of cola.filter((x) => x.mangaId === mangaId)) cancelar(d.capituloId)
+  for (const d of [...descargados.values()].filter((x) => x.mangaId === mangaId)) await borrar(d.capituloId)
+}
+
+/**
+ * Cambia la carpeta de descargas moviendo lo ya descargado. Si la carpeta nueva
+ * ya tenía capítulos de Viñeta (p. ej. un pendrive usado antes), se conservan.
+ */
+export async function cambiarCarpeta(nueva: string | null): Promise<ResultadoCarpeta> {
+  if (cola.some((d) => d.estado !== 'error')) {
+    return { ok: false, error: 'Espera a que terminen las descargas en curso (o cancélalas) antes de cambiar la carpeta.' }
+  }
+  const origen = carpetaDescargas()
+  const destino = nueva ?? carpetaDescargasInicial()
+  const o = resolve(origen).toLowerCase()
+  const d = resolve(destino).toLowerCase()
+  if (o === d) return { ok: true, carpeta: destino, movidos: 0 }
+  if (d.startsWith(o + sep) || o.startsWith(d + sep)) {
+    return { ok: false, error: 'Elige una carpeta que no esté dentro de la actual (ni al revés).' }
+  }
+  try {
+    await mkdir(destino, { recursive: true })
+    await access(destino, constants.W_OK)
+  } catch {
+    return { ok: false, error: 'No se puede guardar en esa carpeta. Prueba con otra.' }
+  }
+
+  moviendo = true
+  avisar()
+  let movidos = 0
+  try {
+    const mangas = carpetaDisponible ? await readdir(origen) : []
+    for (const manga of mangas) {
+      if (!esUuid(manga)) continue
+      for (const cap of await readdir(join(origen, manga))) {
+        if (!esUuid(cap)) continue
+        const de = join(origen, manga, cap)
+        const a = join(destino, manga, cap)
+        if (existsSync(join(a, 'info.json'))) {
+          await rm(de, { recursive: true, force: true })
+          continue
+        }
+        await rm(a, { recursive: true, force: true })
+        await mkdir(join(destino, manga), { recursive: true })
+        try {
+          await rename(de, a)
+        } catch {
+          // Otro disco: no se puede renombrar, se copia y se borra.
+          await cp(de, a, { recursive: true })
+          await rm(de, { recursive: true, force: true })
+        }
+        movidos++
+      }
+      await rmdir(join(origen, manga)).catch(() => {})
+    }
+    almacen.fijarCarpetaDescargas(nueva)
+    return { ok: true, carpeta: destino, movidos }
+  } catch {
+    return { ok: false, error: 'No se pudieron mover todas las descargas. Intenta de nuevo: lo que ya se movió no se pierde.' }
+  } finally {
+    moviendo = false
+    libreCache.hora = 0
+    await indexar()
+    avisar()
+  }
 }

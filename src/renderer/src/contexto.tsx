@@ -31,7 +31,16 @@ interface Global {
 const ContextoGlobal = createContext<Global | null>(null)
 export const useGlobal = () => useContext(ContextoGlobal)!
 
-const SIN_DESCARGAS: EstadoDescargas = { cola: [], descargados: {}, bytesTotales: 0, libreEnDisco: null }
+const SIN_DESCARGAS: EstadoDescargas = {
+  cola: [],
+  descargados: {},
+  bytesTotales: 0,
+  libreEnDisco: null,
+  carpeta: '',
+  carpetaPersonalizada: false,
+  carpetaDisponible: true,
+  automaticos: []
+}
 
 export function ProveedorGlobal({ children }: { children: ReactNode }) {
   const [redWindows, setRedWindows] = useState(navigator.onLine)

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, shell } from 'electron'
 import { join } from 'node:path'
 import * as almacen from './almacen'
+import * as automatico from './automatico'
 import * as descargas from './descargas'
 import { registrarIpc } from './ipc'
 import { manejarProtocolo, registrarEsquema } from './protocolo'
@@ -42,6 +43,10 @@ function crearVentana(): void {
     return { action: 'deny' }
   })
   ventana.webContents.on('will-navigate', (e) => e.preventDefault())
+  // Si la interfaz se cae (falta de memoria, error de la GPU), se recarga en vez de quedar en blanco.
+  ventana.webContents.on('render-process-gone', (_e, d) => {
+    if (d.reason !== 'clean-exit') ventana?.webContents.reload()
+  })
 
   const dev = process.env['ELECTRON_RENDERER_URL']
   ventana.webContents.on('before-input-event', (_e, input) => {
@@ -65,6 +70,7 @@ app.whenReady().then(async () => {
   manejarProtocolo()
   registrarIpc()
   crearVentana()
+  automatico.iniciar()
 })
 
 app.on('window-all-closed', () => app.quit())
