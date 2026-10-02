@@ -29,9 +29,18 @@ export interface Capitulo {
   publicado: string
 }
 
+/** Otro manga ligado a este (continuación, precuela, historia paralela…). */
+export interface Relacionado {
+  /** Tipo de relación ya traducido, p. ej. "Continuación". */
+  relacion: string
+  manga: MangaResumen
+}
+
 /** Ficha completa: resumen + lista de capítulos en los idiomas elegidos. */
 export interface Ficha extends MangaResumen {
   capitulos: Capitulo[]
+  /** Puede faltar en fichas guardadas por versiones anteriores. */
+  relacionados?: Relacionado[]
   /** Momento (ms) en que se trajo desde internet. */
   actualizado: number
 }

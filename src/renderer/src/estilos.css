@@ -1526,3 +1526,33 @@ img.sin-cargar {
   background: #fff;
   transform: translateX(14px);
 }
+
+/* ---------- Ficha sin capítulos y relacionados ---------- */
+
+.sin-capitulos {
+  max-width: 680px;
+  margin: 18px 0 8px;
+  padding: 20px 22px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: var(--superficie);
+}
+
+.sin-capitulos h3 {
+  margin: 0 0 8px;
+  font: 600 17px/1.3 var(--fuente-titulo);
+}
+
+.sin-capitulos p {
+  margin: 0 0 8px;
+  color: var(--texto-2);
+}
+
+.sin-capitulos p:last-child {
+  margin-bottom: 0;
+}
+
+.grilla-chica {
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  margin-top: 16px;
+}

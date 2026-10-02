@@ -4,6 +4,7 @@ import { useGlobal, useNav } from '../contexto'
 import { FilaCapitulo } from '../componentes/FilaCapitulo'
 import { IcoAtras, IcoCheck, IcoDescarga, IcoExterno, IcoLibro, IcoMarcador, IcoMarcadorOk, IcoOrden, IcoSinRed } from '../componentes/Iconos'
 import { Portada } from '../componentes/Portada'
+import { TarjetaManga } from '../componentes/TarjetaManga'
 import { agruparCapitulos, api, clases, etiquetaCapitulo, formatoBytes, mensajeError, urlPortada } from '../util'
 
 // Peso promedio por página, para estimar cuánto ocupará una descarga.
@@ -151,6 +152,7 @@ export default function Ficha({ id }: { id: string }) {
   }
 
   const ordenados = descendente ? [...grupos].reverse() : grupos
+  const relacionados = f.relacionados ?? []
 
   return (
     <section className="vista ficha">
@@ -203,7 +205,8 @@ export default function Ficha({ id }: { id: string }) {
                 <IcoCheck tam={18} /> Descarga automática
               </button>
             ) : (
-              !sinRed && (
+              !sinRed &&
+              grupos.length > 0 && (
                 <button
                   className="boton secundario"
                   onClick={descargarManga}
@@ -267,13 +270,26 @@ export default function Ficha({ id }: { id: string }) {
 
       <div className="capitulos-cabecera">
         <h2>Capítulos</h2>
-        <button className="boton-texto" onClick={() => setDescendente(!descendente)}>
-          <IcoOrden tam={16} /> {descendente ? 'Más nuevos primero' : 'Más antiguos primero'}
-        </button>
+        {grupos.length > 1 && (
+          <button className="boton-texto" onClick={() => setDescendente(!descendente)}>
+            <IcoOrden tam={16} /> {descendente ? 'Más nuevos primero' : 'Más antiguos primero'}
+          </button>
+        )}
       </div>
 
       {grupos.length === 0 ? (
-        <p className="nota">No hay capítulos en tus idiomas. Puedes sumar otro idioma en Ajustes.</p>
+        <div className="sin-capitulos">
+          <h3>No hay capítulos para leer</h3>
+          <p>
+            MangaDex no tiene capítulos disponibles de este manga en tus idiomas. Suele pasar cuando la obra tiene
+            licencia oficial: los capítulos se retiran aunque la ficha siga publicada.
+          </p>
+          <p>
+            {relacionados.length > 0
+              ? 'Prueba con alguna de sus versiones o continuaciones de más abajo, o suma otro idioma en Ajustes.'
+              : 'Puedes sumar otro idioma en Ajustes o buscar otra versión en Explorar.'}
+          </p>
+        </div>
       ) : (
         <ul className="lista-capitulos">
           {ordenados.map((g) => {
@@ -296,6 +312,18 @@ export default function Ficha({ id }: { id: string }) {
             )
           })}
         </ul>
+      )}
+      {relacionados.length > 0 && (
+        <>
+          <div className="capitulos-cabecera">
+            <h2>Relacionados</h2>
+          </div>
+          <div className="grilla grilla-chica">
+            {relacionados.map((r) => (
+              <TarjetaManga key={r.manga.id} manga={r.manga} pie={r.relacion} />
+            ))}
+          </div>
+        </>
       )}
       <p className="credito">Datos e imágenes de MangaDex. Las traducciones son de los grupos que aparecen en cada capítulo.</p>
     </section>

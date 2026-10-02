@@ -1,7 +1,7 @@
 // Cliente de la API pública de MangaDex (https://api.mangadex.org/docs).
 // Respeta sus límites: ~5 llamadas/s a la API y 40/min al servidor de imágenes.
 import { net } from 'electron'
-import type { Capitulo, ConsultaExplorar, Ficha, Idioma, MangaResumen, ResultadoExplorar } from '@compartido/tipos'
+import type { Capitulo, ConsultaExplorar, Ficha, Idioma, MangaResumen, Relacionado, ResultadoExplorar } from '@compartido/tipos'
 import { traducirEtiqueta } from './etiquetas'
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- respuestas JSON de MangaDex */
@@ -209,7 +209,50 @@ export async function ficha(id: string, idiomas: Idioma[]): Promise<Ficha> {
     ['includes[]', 'artist']
   ])
   const capitulos = await capitulosDe(id, idiomas)
-  return { ...aResumen(m.data, idiomas), capitulos, actualizado: Date.now() }
+  const relacionados = await relacionadosDe(m.data, idiomas).catch(() => [])
+  return { ...aResumen(m.data, idiomas), capitulos, relacionados, actualizado: Date.now() }
+}
+
+// Orden y nombre en español de las relaciones que vale la pena mostrar.
+const RELACIONES: Record<string, string> = {
+  sequel: 'Continuación',
+  prequel: 'Precuela',
+  main_story: 'Historia principal',
+  side_story: 'Historia paralela',
+  spin_off: 'Spin-off',
+  colored: 'Versión a color',
+  monochrome: 'Versión en blanco y negro',
+  alternate_version: 'Otra versión',
+  alternate_story: 'Historia alternativa',
+  adapted_from: 'Adaptado de',
+  based_on: 'Basado en',
+  serialization: 'Serialización',
+  preserialization: 'Piloto',
+  shared_universe: 'Mismo universo',
+  same_franchise: 'Misma franquicia'
+}
+
+/** Trae en una sola llamada los mangas relacionados (con portada). */
+async function relacionadosDe(m: any, idiomas: Idioma[]): Promise<Relacionado[]> {
+  const orden = Object.keys(RELACIONES)
+  const rels = (m.relationships ?? [])
+    .filter((r: any) => r.type === 'manga' && RELACIONES[r.related] && esUuid(r.id))
+    .sort((a: any, b: any) => orden.indexOf(a.related) - orden.indexOf(b.related))
+    .slice(0, 24)
+  if (!rels.length) return []
+  const p: Parametros = [
+    ['limit', '24'],
+    ['includes[]', 'cover_art'],
+    ['includes[]', 'author'],
+    ['contentRating[]', 'safe'],
+    ['contentRating[]', 'suggestive']
+  ]
+  for (const r of rels) p.push(['ids[]', r.id])
+  const j = await pedirJson('/manga', p)
+  const porId = new Map<string, MangaResumen>(j.data.map((x: any) => [x.id, aResumen(x, idiomas)]))
+  return rels
+    .filter((r: any) => porId.has(r.id))
+    .map((r: any) => ({ relacion: RELACIONES[r.related], manga: porId.get(r.id)! }))
 }
 
 export interface ServidorCapitulo {
