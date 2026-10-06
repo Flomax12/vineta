@@ -41,3 +41,7 @@ La primera vez, Electron descarga su ejecutable (~110 MB).
 ## Uso de MangaDex
 
 Se respetan sus [reglas de uso de la API](https://api.mangadex.org/docs/): identificación propia (User-Agent), máximo ~4 llamadas por segundo, 40 por minuto al servidor de imágenes, reporte de cada imagen a MangaDex@Home y crédito a los grupos de traducción. Es para uso personal: las traducciones son de grupos aficionados; si te gusta una obra, apoya su edición oficial.
+
+## Licencia
+
+El código está bajo licencia [MIT](LICENSE). Los mangas, portadas e imágenes no son parte de este proyecto: pertenecen a sus autores y se obtienen desde MangaDex.
